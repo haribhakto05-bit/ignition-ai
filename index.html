@@ -576,6 +576,31 @@
   }
   .api-setup-btn:hover { background: #9585f9; transform: translateY(-1px); }
 
+  .install-app-btn {
+    background: linear-gradient(135deg, #6af7b8, #22c55e);
+    color: #0a0a0f;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    box-shadow: 0 4px 15px rgba(106,247,184,0.3);
+    animation: installPulse 2s ease infinite;
+  }
+  .install-app-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(106,247,184,0.5); }
+  @keyframes installPulse {
+    0%, 100% { box-shadow: 0 4px 15px rgba(106,247,184,0.3); }
+    50% { box-shadow: 0 4px 25px rgba(106,247,184,0.6); }
+  }
+  @media (max-width: 768px) {
+    .install-app-btn { font-size: 0; padding: 10px 12px; border-radius: 10px; }
+    .install-app-btn::before { content: '📲'; font-size: 18px; }
+  }
+
   .theme-switcher {
     display: flex;
     align-items: center;
@@ -2179,6 +2204,7 @@
   </button>
   <div class="logo" id="appLogo">IGNITION <span>AI</span></div>
   <div class="live-datetime" id="liveDateTime"></div>
+  <button class="install-app-btn" id="installAppBtn" onclick="triggerInstall()" style="display:none;">📲 Install App</button>
   <button class="api-setup-btn" onclick="showModal()">⚙️ Setup API Key</button>
 </div>
 <!-- Hidden span used by notification helpers — not rendered in UI -->
@@ -4413,59 +4439,83 @@ Rules:
     } catch(e) {}
   }
 
-  // ③ PWA Install Prompt
+  // ③ Install logic
   let deferredPrompt = null;
   const banner = document.getElementById('pwaInstallBanner');
+  const installBtn = document.getElementById('installAppBtn');
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+
+  // Show install btn on iOS (can't use beforeinstallprompt)
+  if (isIOS && !isStandalone && installBtn) installBtn.style.display = 'inline-flex';
 
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     deferredPrompt = e;
-    // Show after 4 seconds delay so it doesn't interfere with login
-    setTimeout(() => {
-      if (banner && deferredPrompt) banner.classList.add('show');
-    }, 4000);
+    if (installBtn) installBtn.style.display = 'inline-flex';
+    setTimeout(() => { if (banner) banner.classList.add('show'); }, 3000);
   });
 
-  window.installPWA = function() {
-    if (!deferredPrompt || !banner) return;
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(choice => {
-      deferredPrompt = null;
-      banner.classList.remove('show');
-    });
-  };
-
-  window.dismissPWA = function() {
+  window.addEventListener('appinstalled', () => {
+    if (installBtn) installBtn.style.display = 'none';
     if (banner) banner.classList.remove('show');
     deferredPrompt = null;
-  };
-
-  // ④ Keyboard shortcuts for power users
-  document.addEventListener('keydown', e => {
-    // Ctrl/Cmd + / → New Chat
-    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
-      e.preventDefault();
-      if (typeof newChat === 'function') newChat();
-    }
-    // Escape → Close sidebar on mobile
-    if (e.key === 'Escape') {
-      if (typeof closeSidebar === 'function') closeSidebar();
-    }
   });
 
-  // ⑤ Haptic feedback on mobile (vibration on task complete, send, etc.)
-  window.haptic = function(pattern) {
-    if (navigator.vibrate) navigator.vibrate(pattern || 30);
+  function showInstallGuide(platform) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(12px);';
+    const content = platform === 'ios' ? `
+      <div style="font-size:48px;margin-bottom:14px;">📱</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:#e8e8f0;margin-bottom:14px;">Install on iPhone / iPad</div>
+      <div style="color:#9ca3af;font-size:14px;line-height:2;margin-bottom:24px;">
+        <b style="color:#7c6af7;">Step 1:</b> Tap the <b style="color:#6af7b8;">Share ↑</b> button at the bottom of Safari<br>
+        <b style="color:#7c6af7;">Step 2:</b> Scroll and tap <b style="color:#6af7b8;">"Add to Home Screen"</b><br>
+        <b style="color:#7c6af7;">Step 3:</b> Tap <b style="color:#6af7b8;">Add</b> — you're done! ⚡
+      </div>` : `
+      <div style="font-size:48px;margin-bottom:14px;">💻</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:#e8e8f0;margin-bottom:14px;">Install on Desktop</div>
+      <div style="color:#9ca3af;font-size:14px;line-height:2;margin-bottom:24px;">
+        <b style="color:#7c6af7;">Chrome / Edge:</b> Look for the <b style="color:#6af7b8;">⊕ icon</b> in the address bar (far right)<br>
+        <b style="color:#7c6af7;">Or:</b> Click <b style="color:#6af7b8;">3-dot ⋮ menu</b> → <em>"Install Ignition AI..."</em><br>
+        <b style="color:#f7c26a;">Note:</b> Must be using Chrome or Edge browser
+      </div>`;
+    overlay.innerHTML = `<div style="background:#12121a;border:1px solid rgba(124,106,247,0.35);border-radius:24px;padding:32px;max-width:360px;width:100%;text-align:center;font-family:'DM Mono',monospace;">${content}<button onclick="this.closest('div[style*=fixed]').remove()" style="background:linear-gradient(135deg,#7c6af7,#a78bfa);border:none;border-radius:12px;color:#fff;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;padding:13px 32px;cursor:pointer;width:100%;letter-spacing:1px;">✅ Got it!</button></div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+
+  window.triggerInstall = window.installPWA = function() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => {
+        deferredPrompt = null;
+        if (installBtn) installBtn.style.display = 'none';
+        if (banner) banner.classList.remove('show');
+      });
+    } else if (isIOS) {
+      showInstallGuide('ios');
+    } else {
+      showInstallGuide('desktop');
+    }
   };
 
-  // ⑥ Prevent pull-to-refresh on mobile (prevents accidental refresh)
+  window.dismissPWA = function() { if (banner) banner.classList.remove('show'); };
+
+  // ④ Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === '/') { e.preventDefault(); if (typeof newChat === 'function') newChat(); }
+    if (e.key === 'Escape' && typeof closeSidebar === 'function') closeSidebar();
+  });
+
+  // ⑤ Haptic feedback
+  window.haptic = p => { try { navigator.vibrate && navigator.vibrate(p || 30); } catch(e){} };
+
+  // ⑥ Prevent pull-to-refresh
   let lastY = 0;
   document.addEventListener('touchstart', e => { lastY = e.touches[0].clientY; }, { passive: true });
   document.addEventListener('touchmove', e => {
-    const delta = e.touches[0].clientY - lastY;
-    if (delta > 0 && document.documentElement.scrollTop === 0 && window.scrollY === 0) {
-      e.preventDefault();
-    }
+    if (e.touches[0].clientY - lastY > 0 && window.scrollY === 0) e.preventDefault();
     lastY = e.touches[0].clientY;
   }, { passive: false });
 
