@@ -3696,15 +3696,15 @@ ${getRecentConversationSummary() || 'No recent conversation yet.'}`;
       let typewriterQueue = '';
       let isTyping = false;
 
-      // Typewriter effect: reveals text character by character
+      // Typewriter effect: reveals text character by character at a steady pace
       function typewriterTick() {
         if (typewriterQueue.length === 0) {
           isTyping = false;
           return;
         }
         isTyping = true;
-        // Reveal a few characters at a time for smooth effect
-        const charsPerTick = Math.max(1, Math.floor(typewriterQueue.length / 30));
+        // Always reveal exactly 2 characters per tick for smooth, consistent speed
+        const charsPerTick = 2;
         const chunk = typewriterQueue.slice(0, charsPerTick);
         typewriterQueue = typewriterQueue.slice(charsPerTick);
         displayedText += chunk;
@@ -3734,18 +3734,17 @@ ${getRecentConversationSummary() || 'No recent conversation yet.'}`;
         }
       }
 
-      // Wait for typewriter to finish rendering remaining text
+      // Wait for typewriter to finish rendering all queued text naturally
       await new Promise(resolve => {
         function waitForTyper() {
-          if (typewriterQueue.length === 0 && !isTyping) { resolve(); return; }
-          // Flush remaining instantly after stream done
-          displayedText += typewriterQueue;
-          typewriterQueue = '';
-          bubble.innerHTML = formatMessageHtml(displayedText);
-          scrollChat();
-          resolve();
+          if (typewriterQueue.length === 0 && !isTyping) {
+            resolve();
+            return;
+          }
+          // Keep polling every 30ms until typewriter has finished
+          setTimeout(waitForTyper, 30);
         }
-        setTimeout(waitForTyper, 80);
+        setTimeout(waitForTyper, 30);
       });
 
       conversationHistory.push({ role: 'assistant', content: fullText });
@@ -3782,23 +3781,71 @@ ${getRecentConversationSummary() || 'No recent conversation yet.'}`;
     const plainText = text.replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').trim();
     const safeText = plainText.replace(/\\/g,'\\\\').replace(/`/g,'\\`').replace(/\$/g,'\\$');
 
-    div.innerHTML = `
-      <div class="msg-avatar">${type === 'ai' ? '🤖' : '😎'}</div>
-      <div>
-        <div class="msg-bubble">${formatMessageHtml(text)}</div>
-        <div class="msg-time">${time}</div>
-        <div class="msg-actions">
-          <button class="msg-action-btn copy-btn" onclick="copyMessage(this, this.getAttribute('data-txt'))">📋 Copy</button>
-          ${type === 'user' ? '<button class="msg-action-btn edit-btn" onclick="openEditMessage(this.closest(\'.msg\'), this.getAttribute(\'data-txt\'))">✏️ Edit</button>' : ''}
-        </div>
-      </div>
-    `;
-    // Store plain text as data attribute (avoids escaping issues in onclick)
-    div.querySelectorAll('[onclick*="data-txt"]').forEach(btn => btn.setAttribute('data-txt', plainText));
+    if (type === 'ai') {
+      // Use typewriter effect for AI messages
+      const avatarDiv = document.createElement('div');
+      avatarDiv.className = 'msg-avatar';
+      avatarDiv.style.cssText = 'background:none;padding:0;';
+      avatarDiv.innerHTML = '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAfQAAAH0CAYAAADL1t+KAAEAAElEQVR..." style="width:36px;height:36px;border-radius:10px;object-fit:contain;background:transparent;" alt="AI">';
+      avatarDiv.textContent = '🤖';
 
-    container.insertBefore(div, typing);
-    scrollChat();
-    autoSaveChat();
+      const bubble = document.createElement('div');
+      bubble.className = 'msg-bubble';
+      bubble.textContent = '';
+
+      const timeDiv = document.createElement('div');
+      timeDiv.className = 'msg-time';
+      timeDiv.textContent = time;
+
+      const innerDiv = document.createElement('div');
+      innerDiv.appendChild(bubble);
+      innerDiv.appendChild(timeDiv);
+
+      div.appendChild(avatarDiv);
+      div.appendChild(innerDiv);
+      container.insertBefore(div, typing);
+      scrollChat();
+
+      // Typewriter animation
+      let queue = text;
+      let displayed = '';
+      function tick() {
+        if (queue.length === 0) {
+          // Add copy button when done
+          const actionsDiv = document.createElement('div');
+          actionsDiv.className = 'msg-actions';
+          actionsDiv.innerHTML = '<button class="msg-action-btn copy-btn" onclick="copyMessage(this, this.getAttribute(\'data-txt\'))">📋 Copy</button>';
+          actionsDiv.querySelector('.copy-btn').setAttribute('data-txt', plainText);
+          innerDiv.appendChild(actionsDiv);
+          autoSaveChat();
+          return;
+        }
+        const chunk = queue.slice(0, 2);
+        queue = queue.slice(2);
+        displayed += chunk;
+        bubble.innerHTML = formatMessageHtml(displayed);
+        scrollChat();
+        setTimeout(tick, 18);
+      }
+      tick();
+    } else {
+      // User messages appear instantly
+      div.innerHTML = `
+        <div class="msg-avatar">😎</div>
+        <div>
+          <div class="msg-bubble">${formatMessageHtml(text)}</div>
+          <div class="msg-time">${time}</div>
+          <div class="msg-actions">
+            <button class="msg-action-btn copy-btn" onclick="copyMessage(this, this.getAttribute('data-txt'))">📋 Copy</button>
+            <button class="msg-action-btn edit-btn" onclick="openEditMessage(this.closest('.msg'), this.getAttribute('data-txt'))">✏️ Edit</button>
+          </div>
+        </div>
+      `;
+      div.querySelectorAll('[onclick*="data-txt"]').forEach(btn => btn.setAttribute('data-txt', plainText));
+      container.insertBefore(div, typing);
+      scrollChat();
+      autoSaveChat();
+    }
   }
 
   function scrollChat() {
