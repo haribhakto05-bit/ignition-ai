@@ -2392,6 +2392,8 @@
         <div class="chip" onclick="quickSend(this)">📧 Write me a cold email that converts</div>
         <div class="chip" onclick="quickSend(this)">📊 Analyze my financial situation</div>
         <div class="chip" onclick="quickSend(this)">🧠 Give me a mindset coaching session</div>
+        <div class="chip" onclick="quickSend(this)">🤖 Explain Deep Learning architectures</div>
+        <div class="chip" onclick="quickSend(this)">🎮 Teach me Reinforcement Learning basics</div>
       </div>
 
       <div class="chat-input-area">
@@ -2859,6 +2861,18 @@ YOUR DEEP EXPERTISE — you can handle ALL of these with precision:
 - Explain machine learning algorithms, SQL for large datasets, Python/R for data science
 - Build Excel financial models, Tableau dashboards, data visualization best practices
 - Communicate complex data insights clearly to non-technical stakeholders
+
+🤖 DEEP LEARNING & REINFORCEMENT LEARNING:
+- Explain and implement deep learning architectures: CNNs, RNNs, LSTMs, Transformers, GANs, VAEs
+- Guide on frameworks: TensorFlow, PyTorch, Keras — model building, training, fine-tuning, deployment
+- Cover reinforcement learning algorithms: Q-Learning, Deep Q-Networks (DQN), Policy Gradient, PPO, A3C, DDPG
+- Explain RL concepts: Markov Decision Processes, reward shaping, exploration vs exploitation, environment design
+- Help with real-world RL applications: game playing, robotics, recommendation systems, trading agents
+- Advise on transfer learning, model compression, hyperparameter tuning, and neural architecture search
+- Explain evaluation metrics, loss functions, optimizers (Adam, SGD, RMSprop) and training tricks
+- Guide on building AI pipelines: data preprocessing, augmentation, batching, GPU training, distributed learning
+- Cover modern AI topics: attention mechanisms, self-supervised learning, few-shot learning, prompt engineering
+- Help debug deep learning issues: vanishing gradients, overfitting, underfitting, training instability
 
 YOUR GOLDEN RULE — ALWAYS POSITIVE, ALWAYS CONSTRUCTIVE:
 You NEVER give negative responses. Turn every problem into an OPPORTUNITY. Turn every challenge into a STRENGTH MOVE. Always make the user feel they are on the right path and just need the right steps. Every answer must leave the user feeling ENERGIZED and CAPABLE.
@@ -3643,6 +3657,26 @@ ${getRecentConversationSummary() || 'No recent conversation yet.'}`;
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullText = '';
+      let displayedText = '';
+      let typewriterQueue = '';
+      let isTyping = false;
+
+      // Typewriter effect: reveals text character by character
+      function typewriterTick() {
+        if (typewriterQueue.length === 0) {
+          isTyping = false;
+          return;
+        }
+        isTyping = true;
+        // Reveal a few characters at a time for smooth effect
+        const charsPerTick = Math.max(1, Math.floor(typewriterQueue.length / 30));
+        const chunk = typewriterQueue.slice(0, charsPerTick);
+        typewriterQueue = typewriterQueue.slice(charsPerTick);
+        displayedText += chunk;
+        bubble.innerHTML = formatMessageHtml(displayedText);
+        scrollChat();
+        setTimeout(typewriterTick, 18);
+      }
 
       while (true) {
         const { done, value } = await reader.read();
@@ -3658,12 +3692,26 @@ ${getRecentConversationSummary() || 'No recent conversation yet.'}`;
             const delta = parsed?.choices?.[0]?.delta?.content || '';
             if (delta) {
               fullText += delta;
-              bubble.innerHTML = formatMessageHtml(fullText);
-              scrollChat();
+              typewriterQueue += delta;
+              if (!isTyping) typewriterTick();
             }
           } catch(e) {}
         }
       }
+
+      // Wait for typewriter to finish rendering remaining text
+      await new Promise(resolve => {
+        function waitForTyper() {
+          if (typewriterQueue.length === 0 && !isTyping) { resolve(); return; }
+          // Flush remaining instantly after stream done
+          displayedText += typewriterQueue;
+          typewriterQueue = '';
+          bubble.innerHTML = formatMessageHtml(displayedText);
+          scrollChat();
+          resolve();
+        }
+        setTimeout(waitForTyper, 80);
+      });
 
       conversationHistory.push({ role: 'assistant', content: fullText });
 
