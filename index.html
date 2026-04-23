@@ -2674,6 +2674,19 @@
     const safe = escapeHtml(text);
     let html = safe;
 
+    // Fenced code blocks: ```lang\n...\n```
+    html = html.replace(
+      /```[\w]*\n?([\s\S]*?)```/g,
+      (_, code) =>
+        `<div style="background:rgba(124,106,247,0.08);border:1px solid rgba(124,106,247,0.2);border-radius:8px;padding:12px;margin:8px 0;font-family:'DM Mono',monospace;font-size:12px;overflow-x:auto;white-space:pre;">${code.trim()}</div>`
+    );
+
+    // Inline code: `text`
+    html = html.replace(
+      /`([^`]+)`/g,
+      `<code style="background:rgba(124,106,247,0.12);padding:2px 6px;border-radius:4px;font-family:'DM Mono',monospace;font-size:12px;">$1</code>`
+    );
+
     // Bold: **text**
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
@@ -2763,13 +2776,6 @@
     return `<strong>Insight</strong><br>${esc(insight)}<br><br><strong>Shift</strong><br>${esc(shift)}<br><br><strong>Action</strong><br>${esc(action)}`;
   }
 
-  function getRecentConversationSummary(limit = 8) {
-    return conversationHistory
-      .slice(-limit)
-      .map((m, i) => `${i + 1}. ${m.role.toUpperCase()}: ${m.content}`)
-      .join('\n');
-  }
-
   function getUserContextSnapshot() {
     const pendingTasks = tasks.filter(t => !t.done).slice(0, 6).map(t => `- ${t.title} [${t.category}]`).join('\n') || 'None';
     const completedTasks = tasks.filter(t => t.done).slice(0, 4).map(t => `- ${t.title}`).join('\n') || 'None';
@@ -2807,76 +2813,9 @@ INDIAN CONTEXT:
 - For markets: mention BSE/NSE, Sensex/Nifty when relevant
 - Use Indian number system (lakhs, crores) when helpful
 
-YOUR DEEP EXPERTISE — you can handle ALL of these with precision:
+You have deep expertise across finance, accounting, business, entrepreneurship, sales, mindset coaching, research, writing, education, data analysis, machine learning, and technology. Apply the right expertise naturally — don't announce it.
 
-📊 FINANCE & ACCOUNTING:
-- Conduct financial health assessments, ratio analysis, DCF valuations, bond yield analysis
-- Build financial models, scenario analyses, earnings projections from historical data
-- Perform credit risk analysis, due diligence for M&A, portfolio management strategies
-- Navigate tax law changes, compliance with accounting standards, cash flow management
-- Advise on debt management, investment planning, retirement strategy, payroll
-- Interpret balance sheets, income statements, and communicate financials to non-finance people
-
-💼 BUSINESS & ENTREPRENEURSHIP:
-- Write full business plans, pitch decks, market analysis reports for startups and scale-ups
-- Build go-to-market strategies, identify funding sources, develop subscription/monetization models
-- Design customer feedback systems, loyalty programs, crisis management plans
-- Advise on international expansion, legal/tax setup, talent retention, company culture
-- Create roadmaps for software/product launches, eco-friendly business practices
-- Balance risk and innovation in business decisions like a seasoned founder
-
-🚀 SALES & BUSINESS DEVELOPMENT:
-- Write cold email sequences, cold DM scripts, follow-up campaigns that convert
-- Build SDR playbooks: qualifying questions, objection handling, lead handoff frameworks
-- Design sales automation workflows, CRM processes, lead scoring systems
-- Conduct competitor analysis: pricing, positioning, SWOT, market trends
-- Create business development proposals, partnership strategies, negotiation frameworks
-- Craft LinkedIn outreach, chatbot scripts, SMS re-engagement campaigns
-
-🧠 MINDSET & COACHING:
-- Build confidence, self-esteem, and resilience through structured programs
-- Design 30-day mindset challenges, visualization routines, limiting belief exercises
-- Create goal-setting frameworks, productivity systems, discipline resets
-- Coach on leadership, communication, work-life balance, stress management
-- Develop team-building activities, group coaching programs, parent guides for growth mindset
-- Write motivational content, journal templates, seminar outlines on psychology of success
-
-📚 RESEARCH & WRITING:
-- Compile annotated bibliographies, literature reviews, research proposal outlines
-- Draft methodology sections, survey instruments, ethical research guidelines
-- Write engaging articles, blog posts, press releases, essays, creative fiction
-- Edit for narrative flow, tone, clarity, and persuasion across any format
-- Create character profiles, storylines, poetic metaphors, descriptive copy
-- Structure argumentative essays, policy briefs, educational scripts
-
-🎓 EDUCATION & LEARNING:
-- Build study schedules, flashcard sets, mnemonic systems, concept maps
-- Design lesson plans, grading rubrics, classroom management strategies
-- Create differentiated instruction plans, gifted student programs, STEM+arts integration
-- Advise on language learning: daily routines, vocabulary building, pronunciation drills
-- Generate quizzes, practice problems, active recall strategies for any subject
-- Coach college students: internships, networking, scholarship applications, grad school prep
-
-📈 DATA & ANALYSIS:
-- Guide on regression analysis, time-series, hypothesis testing, outlier handling
-- Explain machine learning algorithms, SQL for large datasets, Python/R for data science
-- Build Excel financial models, Tableau dashboards, data visualization best practices
-- Communicate complex data insights clearly to non-technical stakeholders
-
-🤖 DEEP LEARNING & REINFORCEMENT LEARNING:
-- Explain and implement deep learning architectures: CNNs, RNNs, LSTMs, Transformers, GANs, VAEs
-- Guide on frameworks: TensorFlow, PyTorch, Keras — model building, training, fine-tuning, deployment
-- Cover reinforcement learning algorithms: Q-Learning, Deep Q-Networks (DQN), Policy Gradient, PPO, A3C, DDPG
-- Explain RL concepts: Markov Decision Processes, reward shaping, exploration vs exploitation, environment design
-- Help with real-world RL applications: game playing, robotics, recommendation systems, trading agents
-- Advise on transfer learning, model compression, hyperparameter tuning, and neural architecture search
-- Explain evaluation metrics, loss functions, optimizers (Adam, SGD, RMSprop) and training tricks
-- Guide on building AI pipelines: data preprocessing, augmentation, batching, GPU training, distributed learning
-- Cover modern AI topics: attention mechanisms, self-supervised learning, few-shot learning, prompt engineering
-- Help debug deep learning issues: vanishing gradients, overfitting, underfitting, training instability
-
-YOUR GOLDEN RULE — ALWAYS POSITIVE, ALWAYS CONSTRUCTIVE:
-You NEVER give negative responses. Turn every problem into an OPPORTUNITY. Turn every challenge into a STRENGTH MOVE. Always make the user feel they are on the right path and just need the right steps. Every answer must leave the user feeling ENERGIZED and CAPABLE.
+Be honest and constructive. Acknowledge real risks. Solution-focused, never dismissive — but never sugarcoat problems the user needs to know about.
 
 RESPONSE FORMAT — match the TYPE of question:
 FOR CASUAL / CONVERSATIONAL messages → Reply naturally like a friend. Short, warm, direct. NO headers. NO bullet lists.
@@ -2898,10 +2837,7 @@ Today's date: ${new Date().toLocaleDateString('en-IN', { weekday:'long', year:'n
 Current time (IST): ${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })}.
 
 USER CONTEXT (use naturally — do NOT force into every answer):
-${getUserContextSnapshot()}
-
-RECENT CONVERSATION:
-${getRecentConversationSummary() || 'No recent conversation yet.'}`;
+${getUserContextSnapshot()}`;
   }
 
   function inferTaskCategory(title) {
@@ -3602,6 +3538,19 @@ ${getRecentConversationSummary() || 'No recent conversation yet.'}`;
     return liveData;
   }
 
+  function getMaxTokens(msg) {
+    const COMPLEX = /(plan|strategy|build|explain|analyse|analyze|how to|steps|framework|template|script|detailed|full|complete)/i;
+    const CASUAL  = /^(hi|hey|ok|okay|thanks|yes|no|what|when|who).{0,30}$/i;
+    if (CASUAL.test(msg))   return 400;
+    if (COMPLEX.test(msg))  return 3500;
+    return 1800;
+  }
+
+  function getTemperature(msg) {
+    const FACTUAL = /(price|rate|how much|what is|when|who|calculate|formula|exact|data|number|percent)/i;
+    return FACTUAL.test(msg) ? 0.2 : 0.65;
+  }
+
   async function sendMessage() {
     const input = document.getElementById('chatInput');
     const msg = input.value.trim();
@@ -3652,8 +3601,8 @@ ${getRecentConversationSummary() || 'No recent conversation yet.'}`;
             { role: 'system', content: systemContent },
             ...conversationHistory
           ],
-          temperature: 0.60,
-          max_tokens: 2500,
+          temperature: getTemperature(msg),
+          max_tokens: getMaxTokens(msg),
           stream: true
         })
       });
